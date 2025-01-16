@@ -13,6 +13,7 @@ A template for creating Svelte applications powered by the **Pear runtime**, des
 ---
 
 ## Run with Pear
+[Setup Pear](https://docs.pears.com/guides/getting-started)
 ```shell
    pear run pear://3bscfiy9y55h568n19qpzjsqx1tan5ec1p9e7hoqpop99zxhshiy
 ```
