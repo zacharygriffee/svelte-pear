@@ -1,0 +1,44 @@
+{
+  "name": "svelte-pear",
+  "version": "1.0.0",
+  "description": "A template project for creating Svelte applications with the Pear runtime.",
+  "main": "index.html",
+  "pear": {
+    "name": "svelte-pear",
+    "type": "desktop",
+    "gui": {
+      "backgroundColor": "#ffffff",
+      "height": 768,
+      "width": 1024
+    }
+  },
+  "author": "Zachary Griffee",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "watch-build": "nodemon --watch src --ext js,svelte --exec 'npm run build'",
+    "build": "rollup -c",
+    "dev": "npm run watch-build & pear run -d .",
+    "test": "brittle test/*.test.js",
+    "clean": "rm -rf dist build"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "brittle": "^3.0.0",
+    "nodemon": "^3.1.9",
+    "pear-interface": "^1.0.0",
+    "rollup": "^4.30.1",
+    "rollup-plugin-svelte": "^7.2.2",
+    "svelte": "^5.18.0"
+  },
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zacharygriffee/svelte-pear.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zacharygriffee/svelte-pear/issues"
+  },
+  "homepage": "https://github.com/zacharygriffee/svelte-pear"
+}
