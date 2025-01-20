@@ -1,28 +1,30 @@
 {
-  "name": "svelte-pear",
-  "version": "1.0.0",
-  "description": "A template project for creating Svelte applications with the Pear runtime.",
-  "main": "index.html",
+  "name": "__name__",
   "pear": {
-    "name": "svelte-pear",
+    "name": "__name__",
     "type": "desktop",
     "gui": {
-      "backgroundColor": "#ffffff",
-      "height": 768,
-      "width": 1024
+      "backgroundColor": "#1F2430",
+      "height": "__height__",
+      "width": "__width__"
     }
   },
-  "author": "Zachary Griffee",
-  "license": "MIT",
   "type": "module",
+  "license": "__license__",
+  "main": "index.html",
   "scripts": {
     "watch-build": "nodemon --watch src --ext js,svelte --exec 'npm run build'",
     "build": "rollup -c",
-    "dev": "npm run watch-build & pear run -d .",
+    "watch-dev": "npm run clean && npm run build && pear run -d . && npm run watch-build",
+    "dev": "npm run build && pear run -d .",
     "test": "brittle test/*.test.js",
     "clean": "rm -rf dist build"
   },
+  "sideEffects": [
+    "*.js"
+  ],
   "devDependencies": {
+    "@rollup/plugin-alias": "^5.1.1",
     "@rollup/plugin-commonjs": "^28.0.2",
     "@rollup/plugin-node-resolve": "^16.0.0",
     "brittle": "^3.0.0",
@@ -31,14 +33,5 @@
     "rollup": "^4.30.1",
     "rollup-plugin-svelte": "^7.2.2",
     "svelte": "^5.18.0"
-  },
-  "dependencies": {},
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/zacharygriffee/svelte-pear.git"
-  },
-  "bugs": {
-    "url": "https://github.com/zacharygriffee/svelte-pear/issues"
-  },
-  "homepage": "https://github.com/zacharygriffee/svelte-pear"
+  }
 }

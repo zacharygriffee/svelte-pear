@@ -5,17 +5,18 @@ A template for creating Svelte applications powered by the **Pear runtime**, des
 ## Features
 
 - **Svelte**: A modern, reactive framework for building user interfaces.
-- **Pear Runtime**: P2P-ready runtime with IPC support and production packaging.
+- **Pear Runtime**: P2P-ready runtime.
 - **Rollup**: Creates bundles for development purposes.
 - **Testing**: Includes `brittle` for testing.
 - **File Watching**: Automatically rebuilds bundles during development.
 
 ---
 
-## Run with Pear
+## Installation
 [Setup Pear](https://docs.pears.com/guides/getting-started)
+Open terminal to init where . is the directory you like to init the project to.
 ```shell
-   pear run pear://3bscfiy9y55h568n19qpzjsqx1tan5ec1p9e7hoqpop99zxhshiy
+   pear init pear://3bscfiy9y55h568n19qpzjsqx1tan5ec1p9e7hoqpop99zxhshiy .
 ```
 
 ## Project Structure
@@ -23,19 +24,23 @@ A template for creating Svelte applications powered by the **Pear runtime**, des
 ```
 svelte-pear/
 ├── build/                 # Bundled output (source for production Pear app)
-│   └── bundle.js          # Bundled JavaScript file (Rollup output)
+│   └── app.js             # Bundled JavaScript file (Rollup output)
 ├── src/                   # Source files (used only during development)
-│   ├── components/        # Svelte components
-│   │   └ Component.svelte # Conventional area for svelte components
-│   └── app.js             # Rollup entry point
-|   └── App.svelte         # Main App component
+│   ├── lib/               # Library folder (root of application source)
+│   │   ├── components/    # Svelte components
+│   │   │   └── Counter.svelte # Example Svelte component
+│   │   └── app.js         # Rollup entry point
+│   │   └── App.svelte     # Main App component
 ├── test/                  # Test files
-│   └── index.test.js      # Example test
+│   └── index.test.js      # Example test file
+├── _template.json         # Template JSON (specific to your app needs)
 ├── index.html             # Main entry point for Pear (root-level)
 ├── package.json           # Project configuration and dependencies
 ├── package-lock.json      # Locked dependency versions
+├── README.md              # Project documentation
 └── rollup.config.js       # Rollup configuration file
 ```
+$lib and $src similar to sveltekit alias work as expected here.
 
 ### Key Directories and Files
 

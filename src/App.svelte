@@ -1,5 +1,5 @@
 <script>
-    import Counter from "./components/Counter.svelte";
+    import Counter from "./lib/components/Counter.svelte";
 </script>
 <div id="bar"><pear-ctrl></pear-ctrl></div>
 <div class="centered-container">
