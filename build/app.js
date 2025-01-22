@@ -7,6 +7,9 @@ var index_of = Array.prototype.indexOf;
 var array_from = Array.from;
 var define_property = Object.defineProperty;
 var get_descriptor = Object.getOwnPropertyDescriptor;
+var object_prototype = Object.prototype;
+var array_prototype = Array.prototype;
+var get_prototype_of = Object.getPrototypeOf;
 
 /** @param {Array<() => void>} arr */
 function run_all(arr) {
@@ -32,8 +35,12 @@ const DESTROYED = 1 << 14;
 const EFFECT_RAN = 1 << 15;
 /** 'Transparent' effects do not create a transition boundary */
 const EFFECT_TRANSPARENT = 1 << 16;
+/** Svelte 4 legacy mode props need to be handled with deriveds and be recognized elsewhere, hence the dedicated flag */
+const LEGACY_DERIVED_PROP = 1 << 17;
 const HEAD_EFFECT = 1 << 19;
 const EFFECT_HAS_DERIVED = 1 << 20;
+
+const STATE_SYMBOL = Symbol('$state');
 
 /** @import { Equals } from '#client' */
 /** @type {Equals} */
@@ -71,6 +78,26 @@ function effect_update_depth_exceeded() {
 }
 
 /**
+ * Property descriptors defined on `$state` objects must contain `value` and always be `enumerable`, `configurable` and `writable`.
+ * @returns {never}
+ */
+function state_descriptors_fixed() {
+	{
+		throw new Error(`https://svelte.dev/e/state_descriptors_fixed`);
+	}
+}
+
+/**
+ * Cannot set prototype of `$state` object
+ * @returns {never}
+ */
+function state_prototype_fixed() {
+	{
+		throw new Error(`https://svelte.dev/e/state_prototype_fixed`);
+	}
+}
+
+/**
  * Reading state that was created inside the same derived is forbidden. Consider using `untrack` to read locally created state
  * @returns {never}
  */
@@ -97,8 +124,14 @@ function enable_legacy_mode_flag() {
 	legacy_mode_flag = true;
 }
 
+const PROPS_IS_IMMUTABLE = 1;
+const PROPS_IS_RUNES = 1 << 1;
+const PROPS_IS_BINDABLE = 1 << 3;
+
 const TEMPLATE_FRAGMENT = 1;
 const TEMPLATE_USE_IMPORT_NODE = 1 << 1;
+
+const UNINITIALIZED = Symbol();
 
 /** @import { Derived, Effect, Reaction, Source, Value } from '#client' */
 
@@ -233,6 +266,260 @@ function mark_reactions(signal, status) {
 			}
 		}
 	}
+}
+
+/** @import { ProxyMetadata, ProxyStateObject, Source } from '#client' */
+
+/**
+ * @template T
+ * @param {T} value
+ * @param {ProxyMetadata | null} [parent]
+ * @param {Source<T>} [prev] dev mode only
+ * @returns {T}
+ */
+function proxy(value, parent = null, prev) {
+	// if non-proxyable, or is already a proxy, return `value`
+	if (typeof value !== 'object' || value === null || STATE_SYMBOL in value) {
+		return value;
+	}
+
+	const prototype = get_prototype_of(value);
+
+	if (prototype !== object_prototype && prototype !== array_prototype) {
+		return value;
+	}
+
+	/** @type {Map<any, Source<any>>} */
+	var sources = new Map();
+	var is_proxied_array = is_array(value);
+	var version = source(0);
+
+	if (is_proxied_array) {
+		// We need to create the length source eagerly to ensure that
+		// mutations to the array are properly synced with our proxy
+		sources.set('length', source(/** @type {any[]} */ (value).length));
+	}
+
+	/** @type {ProxyMetadata} */
+	var metadata;
+
+	return new Proxy(/** @type {any} */ (value), {
+		defineProperty(_, prop, descriptor) {
+			if (
+				!('value' in descriptor) ||
+				descriptor.configurable === false ||
+				descriptor.enumerable === false ||
+				descriptor.writable === false
+			) {
+				// we disallow non-basic descriptors, because unless they are applied to the
+				// target object — which we avoid, so that state can be forked — we will run
+				// afoul of the various invariants
+				// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/getOwnPropertyDescriptor#invariants
+				state_descriptors_fixed();
+			}
+
+			var s = sources.get(prop);
+
+			if (s === undefined) {
+				s = source(descriptor.value);
+				sources.set(prop, s);
+			} else {
+				set(s, proxy(descriptor.value, metadata));
+			}
+
+			return true;
+		},
+
+		deleteProperty(target, prop) {
+			var s = sources.get(prop);
+
+			if (s === undefined) {
+				if (prop in target) {
+					sources.set(prop, source(UNINITIALIZED));
+				}
+			} else {
+				// When working with arrays, we need to also ensure we update the length when removing
+				// an indexed property
+				if (is_proxied_array && typeof prop === 'string') {
+					var ls = /** @type {Source<number>} */ (sources.get('length'));
+					var n = Number(prop);
+
+					if (Number.isInteger(n) && n < ls.v) {
+						set(ls, n);
+					}
+				}
+				set(s, UNINITIALIZED);
+				update_version(version);
+			}
+
+			return true;
+		},
+
+		get(target, prop, receiver) {
+
+			if (prop === STATE_SYMBOL) {
+				return value;
+			}
+
+			var s = sources.get(prop);
+			var exists = prop in target;
+
+			// create a source, but only if it's an own property and not a prototype property
+			if (s === undefined && (!exists || get_descriptor(target, prop)?.writable)) {
+				s = source(proxy(exists ? target[prop] : UNINITIALIZED, metadata));
+				sources.set(prop, s);
+			}
+
+			if (s !== undefined) {
+				var v = get(s);
+
+				return v === UNINITIALIZED ? undefined : v;
+			}
+
+			return Reflect.get(target, prop, receiver);
+		},
+
+		getOwnPropertyDescriptor(target, prop) {
+			var descriptor = Reflect.getOwnPropertyDescriptor(target, prop);
+
+			if (descriptor && 'value' in descriptor) {
+				var s = sources.get(prop);
+				if (s) descriptor.value = get(s);
+			} else if (descriptor === undefined) {
+				var source = sources.get(prop);
+				var value = source?.v;
+
+				if (source !== undefined && value !== UNINITIALIZED) {
+					return {
+						enumerable: true,
+						configurable: true,
+						value,
+						writable: true
+					};
+				}
+			}
+
+			return descriptor;
+		},
+
+		has(target, prop) {
+
+			if (prop === STATE_SYMBOL) {
+				return true;
+			}
+
+			var s = sources.get(prop);
+			var has = (s !== undefined && s.v !== UNINITIALIZED) || Reflect.has(target, prop);
+
+			if (
+				s !== undefined ||
+				(active_effect !== null && (!has || get_descriptor(target, prop)?.writable))
+			) {
+				if (s === undefined) {
+					s = source(has ? proxy(target[prop], metadata) : UNINITIALIZED);
+					sources.set(prop, s);
+				}
+
+				var value = get(s);
+				if (value === UNINITIALIZED) {
+					return false;
+				}
+			}
+
+			return has;
+		},
+
+		set(target, prop, value, receiver) {
+			var s = sources.get(prop);
+			var has = prop in target;
+
+			// variable.length = value -> clear all signals with index >= value
+			if (is_proxied_array && prop === 'length') {
+				for (var i = value; i < /** @type {Source<number>} */ (s).v; i += 1) {
+					var other_s = sources.get(i + '');
+					if (other_s !== undefined) {
+						set(other_s, UNINITIALIZED);
+					} else if (i in target) {
+						// If the item exists in the original, we need to create a uninitialized source,
+						// else a later read of the property would result in a source being created with
+						// the value of the original item at that index.
+						other_s = source(UNINITIALIZED);
+						sources.set(i + '', other_s);
+					}
+				}
+			}
+
+			// If we haven't yet created a source for this property, we need to ensure
+			// we do so otherwise if we read it later, then the write won't be tracked and
+			// the heuristics of effects will be different vs if we had read the proxied
+			// object property before writing to that property.
+			if (s === undefined) {
+				if (!has || get_descriptor(target, prop)?.writable) {
+					s = source(undefined);
+					set(s, proxy(value, metadata));
+					sources.set(prop, s);
+				}
+			} else {
+				has = s.v !== UNINITIALIZED;
+				set(s, proxy(value, metadata));
+			}
+
+			var descriptor = Reflect.getOwnPropertyDescriptor(target, prop);
+
+			// Set the new value before updating any signals so that any listeners get the new value
+			if (descriptor?.set) {
+				descriptor.set.call(receiver, value);
+			}
+
+			if (!has) {
+				// If we have mutated an array directly, we might need to
+				// signal that length has also changed. Do it before updating metadata
+				// to ensure that iterating over the array as a result of a metadata update
+				// will not cause the length to be out of sync.
+				if (is_proxied_array && typeof prop === 'string') {
+					var ls = /** @type {Source<number>} */ (sources.get('length'));
+					var n = Number(prop);
+
+					if (Number.isInteger(n) && n >= ls.v) {
+						set(ls, n + 1);
+					}
+				}
+
+				update_version(version);
+			}
+
+			return true;
+		},
+
+		ownKeys(target) {
+			get(version);
+
+			var own_keys = Reflect.ownKeys(target).filter((key) => {
+				var source = sources.get(key);
+				return source === undefined || source.v !== UNINITIALIZED;
+			});
+
+			for (var [key, source] of sources) {
+				if (source.v !== UNINITIALIZED && !(key in target)) {
+					own_keys.push(key);
+				}
+			}
+
+			return own_keys;
+		},
+
+		setPrototypeOf() {
+			state_prototype_fixed();
+		}
+	});
+}
+
+/**
+ * @param {Source<number>} signal
+ * @param {1 | -1} [d]
+ */
+function update_version(signal, d = 1) {
+	set(signal, signal.v + d);
 }
 
 /** @import { TemplateNode } from '#client' */
@@ -402,6 +689,18 @@ function derived(fn) {
 		(parent_derived.children ??= []).push(signal);
 	}
 
+	return signal;
+}
+
+/**
+ * @template V
+ * @param {() => V} fn
+ * @returns {Derived<V>}
+ */
+/*#__NO_SIDE_EFFECTS__*/
+function derived_safe_equal(fn) {
+	const signal = derived(fn);
+	signal.equals = safe_equals;
 	return signal;
 }
 
@@ -2153,6 +2452,9 @@ function with_parent_branch(fn) {
  * @returns {(() => V | ((arg: V) => V) | ((arg: V, mutation: boolean) => V))}
  */
 function prop(props, key, flags, fallback) {
+	var immutable = (flags & PROPS_IS_IMMUTABLE) !== 0;
+	var runes = !legacy_mode_flag || (flags & PROPS_IS_RUNES) !== 0;
+	var bindable = (flags & PROPS_IS_BINDABLE) !== 0;
 	var prop_value;
 
 	{
@@ -2177,13 +2479,25 @@ function prop(props, key, flags, fallback) {
 
 	/** @type {() => V} */
 	var getter;
-	{
+	if (runes) {
 		getter = () => {
 			var value = /** @type {V} */ (props[key]);
 			if (value === undefined) return get_fallback();
 			fallback_dirty = true;
 			fallback_used = false;
 			return value;
+		};
+	} else {
+		// Svelte 4 did not trigger updates when a primitive value was updated to the same value.
+		// Replicate that behavior through using a derived
+		var derived_getter = with_parent_branch(() =>
+			(immutable ? derived : derived_safe_equal)(() => /** @type {V} */ (props[key]))
+		);
+		derived_getter.f |= LEGACY_DERIVED_PROP;
+		getter = () => {
+			var value = get(derived_getter);
+			if (value !== undefined) fallback_value = /** @type {V} */ (undefined);
+			return value === undefined ? fallback_value : value;
 		};
 	}
 
@@ -2215,7 +2529,7 @@ function prop(props, key, flags, fallback) {
 	return function (/** @type {any} */ value, /** @type {boolean} */ mutation) {
 
 		if (arguments.length > 0) {
-			const new_value = mutation ? get(current_value) : value;
+			const new_value = mutation ? get(current_value) : runes && bindable ? proxy(value) : value;
 
 			if (!current_value.equals(new_value)) {
 				from_child = true;
@@ -2248,7 +2562,7 @@ var on_click = (_, n) => n(+n() + 1);
 var root$1 = template(`<input type="button">`);
 
 function Counter($$anchor, $$props) {
-	let n = prop($$props, 'n');
+	let n = prop($$props, 'n', 7);
 	var input = root$1();
 	input.__click = [on_click, n];
 	template_effect(() => set_value(input, n()));
@@ -2277,8 +2591,8 @@ function App($$anchor) {
 
 /** @typedef {import('pear-interface')} */ /* global Pear */
 
-Pear.updates(() => {
-    Pear.reload();
-});
+// Pear.updates(() => {
+//     Pear.reload();
+// });
 mount(App, {target: document.getElementById("app"),props: {Pear}});
-//# sourceMappingURL=bundle.js.map
+//# sourceMappingURL=app.js.map
