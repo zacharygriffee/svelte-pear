@@ -16,7 +16,7 @@ A template for creating Svelte applications powered by the **Pear runtime**, des
 [Setup Pear](https://docs.pears.com/guides/getting-started)
 Open terminal to init where . is the directory you like to init the project to.
 ```shell
-   pear init pear://3bscfiy9y55h568n19qpzjsqx1tan5ec1p9e7hoqpop99zxhshiy .
+   pear init pear://8cnwqjydhcx6714sfty3kkdyracjng6ohwfmagxsixggcnnpskzo .
 ```
 
 ## Project Structure
