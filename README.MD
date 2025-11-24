@@ -15,8 +15,18 @@ A template for creating Svelte applications powered by the **Pear runtime**, des
 ## Installation
 [Setup Pear](https://docs.pears.com/guides/getting-started)
 Open terminal to init where . is the directory you like to init the project to.
+Prefer cloning from GitHub for now (until a stable pear seed is available):
+
+```bash
+git clone https://github.com/zacharygriffee/svelte-pear-template.git my-new-app
+cd my-new-app
+npm install
+```
+
+If/when seeding is available, you can also init from the staged template:
+
 ```shell
-   pear init pear://8cnwqjydhcx6714sfty3kkdyracjng6ohwfmagxsixggcnnpskzo .
+pear init pear://8cnwqjydhcx6714sfty3kkdyracjng6ohwfmagxsixggcnnpskzo .
 ```
 
 ## Project Structure
