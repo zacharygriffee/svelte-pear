@@ -7,11 +7,12 @@ import path from "path";
 const includedModules = ['specific-library-1', 'specific-library-2']; // Replace with modules you want to include
 
 export default {
-    input: 'src/app.js',
+    input: 'src/entry.js',
     output: {
-        dir: 'build/',
+        dir: 'dist/',
         format: 'es',
         name: 'app',
+        entryFileNames: 'entry.js',
         sourcemap: true,
     },
     external: (id) => {
