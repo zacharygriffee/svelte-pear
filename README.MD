@@ -22,7 +22,6 @@ Open terminal to init where . is the directory you like to init the project to.
 ## Project Structure
 
 ```
-```
 svelte-pear/
 ├── app.js                 # Browser entry; loads Pear bridges and the bundled UI
 ├── dist/                  # Bundled UI output consumed by app.js
