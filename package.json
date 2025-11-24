@@ -15,8 +15,10 @@
   "scripts": {
     "watch-build": "nodemon --watch src --ext js,svelte --exec 'npm run build'",
     "build": "rollup -c",
-    "watch-dev": "npm run clean && npm run build && pear run -d . && npm run watch-build",
+    "watch-dev": "npm run clean && npm run build && (npm run watch-build &) pear run -d .",
     "dev": "npm run build && pear run -d .",
+    "dev-package": "node tools/dev-package.js",
+    "restore-template": "node tools/dev-package.js restore",
     "test": "brittle test/*.test.js",
     "clean": "rm -rf dist build"
   },
