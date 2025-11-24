@@ -165,6 +165,12 @@ When the app is ready for production:
    [Read pear docs for more details.](https://docs.pears.com/)
 3. Your app at this point should be available for download via p2p pear link.
 
+### Publishing via Pear
+
+- Keep `package.json` templated when staging/publishing so `_template.json` can inject values; run `npm run restore-template` before any `pear stage` commands.
+- Links are derived from `pear.name` and channel; use the same name/channel to keep the same pear link across machines.
+- Typical flow from a clean checkout: `npm run restore-template && npm ci && npm run build && pear stage dev` (or `production`), then `pear seed <channel>` to share.
+
 ### Working with templated package.json
 
 During template development, run:
